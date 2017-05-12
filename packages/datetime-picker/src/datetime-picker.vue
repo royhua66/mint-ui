@@ -124,7 +124,21 @@
         type: Number,
         default: 7
       },
-      value: null
+      value: null,
+      weekText: {
+        type: Array,
+        default() {
+          return [
+            '周日',
+            '周一',
+            '周二',
+            '周三',
+            '周四',
+            '周五',
+            '周六'
+          ];
+        }
+      }
     },
 
     data() {
@@ -216,22 +230,28 @@
         this.handleValueChange();
       },
 
-      fillValues(type, start, end) {
+      fillValues(type, start, end, other) {
         let values = [];
         for (let i = start; i <= end; i++) {
+          let text = '';
           if (i < 10) {
-            values.push(this[`${FORMAT_MAP[type]}Format`].replace('{value}', ('0' + i).slice(-2)));
+            text = this[`${FORMAT_MAP[type]}Format`].replace('{value}', ('0' + i).slice(-2));
           } else {
-            values.push(this[`${FORMAT_MAP[type]}Format`].replace('{value}', i));
+            text = this[`${FORMAT_MAP[type]}Format`].replace('{value}', i);
           }
+          if (type === 'D') {
+            text = text.replace('{week}', other.week[i - 1]);
+          }
+
+          values.push(text);
         }
         return values;
       },
 
-      pushSlots(slots, type, start, end) {
+      pushSlots(slots, type, start, end, other) {
         slots.push({
           flex: 1,
-          values: this.fillValues(type, start, end)
+          values: this.fillValues(type, start, end, other)
         });
       },
 
@@ -269,10 +289,14 @@
             this.minuteFormat.replace('{value}', currentValue[1])
           ];
         } else {
+          let dateText = this.dateFormat.replace('{value}', ('0' + this.getDate(this.currentValue)).slice(-2));
+          if (this.dateFormat.indexOf('{week}') > 0) {
+            dateText = dateText.replace('{week}', this.getWeek(this.currentValue));
+          }
           values = [
             this.yearFormat.replace('{value}', this.getYear(this.currentValue)),
             this.monthFormat.replace('{value}', ('0' + this.getMonth(this.currentValue)).slice(-2)),
-            this.dateFormat.replace('{value}', ('0' + this.getDate(this.currentValue)).slice(-2))
+            dateText
           ];
           if (this.type === 'datetime') {
             values.push(
@@ -343,6 +367,11 @@
         return this.isDateString(value) ? value.split(' ')[0].split(/-|\/|\./)[2] : value.getDate();
       },
 
+      getWeek(value) {
+        let date = this.isDateString(value) ? new Date(value) : value;
+        return this.weekText[date.getDay()];
+      },
+
       getHour(value) {
         if (this.isDateString(value)) {
           const str = value.split(' ')[1] || '00:00:00';
@@ -371,7 +400,7 @@
 
     computed: {
       rims() {
-        if (!this.currentValue) return { year: [], month: [], date: [], hour: [], min: [] };
+        if (!this.currentValue) return { year: [], month: [], date: [], hour: [], min: []};
         let result;
         if (this.type === 'time') {
           result = {
@@ -380,12 +409,23 @@
           };
           return result;
         }
+
         result = {
           year: [this.startDate.getFullYear(), this.endDate.getFullYear()],
           month: [1, 12],
           date: [1, this.getMonthEndDay(this.getYear(this.currentValue), this.getMonth(this.currentValue))],
           hour: [0, 23],
           min: [0, 59]
+        };
+        let start = result.date[0];
+        let end = result.date[1];
+        let week = [];
+        for (let i = start; i <= end; i++) {
+          let date = new Date(this.getYear(this.currentValue), this.getMonth(this.currentValue) - 1, i);
+          week.push(this.weekText[date.getDay()]);
+        }
+        result.date[2] = {
+          week
         };
         this.rimDetect(result, 'start');
         this.rimDetect(result, 'end');
